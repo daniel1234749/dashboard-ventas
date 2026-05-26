@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Ventas — Sucursal Tucumán</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <!-- ══════════ INICIO ══════════ -->
+  <div id="inicio-screen">
+    <div class="inicio-card">
+      <div class="upload-icon">📊</div>
+      <h1>Dashboard de Ventas</h1>
+      <p class="upload-subtitle">Sucursal Tucumán · Proyección Mayo 2026</p>
+      <p class="inicio-pregunta">¿Qué querés analizar?</p>
+      <div class="inicio-opciones inicio-opciones-4">
+        <div class="inicio-opcion" onclick="elegirVista('familias')">
+          <div class="inicio-opcion-icon">🏷️</div>
+          <div class="inicio-opcion-titulo">Familias</div>
+          <div class="inicio-opcion-desc">Análisis por familia de productos<br>(COMESTIBLES, PERFUMERIA, etc.)</div>
+        </div>
+        <div class="inicio-opcion" onclick="elegirVista('departamentos')">
+          <div class="inicio-opcion-icon">📦</div>
+          <div class="inicio-opcion-titulo">Departamentos</div>
+          <div class="inicio-opcion-desc">Análisis por departamento<br>(FIDEOS, GASEOSAS, YOGURES, etc.)</div>
+        </div>
+        <div class="inicio-opcion inicio-opcion-sucursales" onclick="mostrarSucursales()">
+          <div class="inicio-opcion-icon">🏪</div>
+          <div class="inicio-opcion-titulo">Comparativa Familias</div>
+          <div class="inicio-opcion-desc">Fair · Burzaco · A.Korn · Tucumán<br>Participación por familia</div>
+        </div>
+        <div class="inicio-opcion inicio-opcion-dpto-comp" onclick="mostrarDptoComp()">
+          <div class="inicio-opcion-icon">🔀</div>
+          <div class="inicio-opcion-titulo">Comparativa Deptos</div>
+          <div class="inicio-opcion-desc">Fair · Burzaco · A.Korn · Tucumán<br>Ventas por departamento</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ UPLOAD depto/familia ══════════ -->
+  <div id="upload-screen" style="display:none">
+    <div class="upload-card">
+      <div class="upload-icon" id="upload-icon">📊</div>
+      <h1 id="upload-titulo">Dashboard de Ventas</h1>
+      <p class="upload-subtitle" id="upload-subtitulo">Sucursal Tucumán · Proyección Mayo 2026</p>
+      <div class="upload-zone" id="drop-zone">
+        <div class="upload-zone-icon">⬆️</div>
+        <p class="upload-zone-title">Arrastrá tu archivo Excel o CSV aquí</p>
+        <p class="upload-zone-sub">o hacé clic para seleccionarlo</p>
+        <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden>
+        <button class="btn-upload" onclick="document.getElementById('file-input').click()">Seleccionar archivo</button>
+      </div>
+      <div class="upload-info" id="upload-info"></div>
+      <div class="upload-rango">
+        <div class="rango-titulo">📅 Período de datos de Mayo</div>
+        <div class="rango-inputs">
+          <div class="rango-campo"><label>Desde</label><input type="date" id="fecha-desde" value="2026-05-01"></div>
+          <div class="rango-flecha">→</div>
+          <div class="rango-campo"><label>Hasta</label><input type="date" id="fecha-hasta"></div>
+        </div>
+        <div class="rango-preview" id="rango-preview">Seleccioná las fechas para ver la proyección</div>
+      </div>
+      <div id="upload-error" class="upload-error" style="display:none"></div>
+      <button class="btn-volver" onclick="volverInicio()">← Volver</button>
+    </div>
+  </div>
+
+  <!-- ══════════ UPLOAD SUCURSALES (familias) ══════════ -->
+  <div id="upload-sucursales-screen" style="display:none">
+    <div class="upload-card">
+      <div class="upload-icon">🏪</div>
+      <h1>Comparativa de Familias</h1>
+      <p class="upload-subtitle">Participación por familia · Mayo 2026</p>
+      <div class="upload-zone" id="suc-drop-zone">
+        <div class="upload-zone-icon">⬆️</div>
+        <p class="upload-zone-title">Arrastrá tu archivo Excel o CSV aquí</p>
+        <p class="upload-zone-sub">o hacé clic para seleccionarlo</p>
+        <input type="file" id="suc-file-input" accept=".xlsx,.xls,.csv" hidden>
+        <button class="btn-upload" onclick="document.getElementById('suc-file-input').click()">Seleccionar archivo</button>
+      </div>
+      <div class="upload-info">
+        <p>📋 Columnas esperadas:</p>
+        <ul>
+          <li><strong>familia_cod</strong> — código de familia</li>
+          <li><strong>familia</strong> — nombre de la familia</li>
+          <li><strong>Una columna por sucursal</strong> (Fair, Burzaco, A.Korn, Tucuman)</li>
+        </ul>
+      </div>
+      <div class="suc-upload-ejemplo">
+        <div class="ejemplo-titulo">📄 Ejemplo:</div>
+        <table class="ejemplo-tabla">
+          <thead><tr><th>familia_cod</th><th>familia</th><th>Fair</th><th>Burzaco</th><th>A.Korn</th><th>Tucuman</th></tr></thead>
+          <tbody>
+            <tr><td>01</td><td>COMESTIBLES</td><td>238786</td><td>51895</td><td>124528</td><td>35678</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="suc-upload-error" class="upload-error" style="display:none"></div>
+      <button class="btn-volver" onclick="volverInicioSucursales()">← Volver</button>
+    </div>
+  </div>
+
+  <!-- ══════════ UPLOAD DEPTOS COMPARATIVA ══════════ -->
+  <div id="upload-dpto-comp-screen" style="display:none">
+    <div class="upload-card">
+      <div class="upload-icon">🔀</div>
+      <h1>Comparativa de Departamentos</h1>
+      <p class="upload-subtitle">Ventas por sucursal · Por departamento</p>
+      <div class="upload-zone" id="dc-drop-zone">
+        <div class="upload-zone-icon">⬆️</div>
+        <p class="upload-zone-title">Arrastrá tu archivo Excel o CSV aquí</p>
+        <p class="upload-zone-sub">o hacé clic para seleccionarlo</p>
+        <input type="file" id="dc-file-input" accept=".xlsx,.xls,.csv" hidden>
+        <button class="btn-upload" onclick="document.getElementById('dc-file-input').click()">Seleccionar archivo</button>
+      </div>
+      <div class="upload-info">
+        <p>📋 Columnas esperadas:</p>
+        <ul>
+          <li><strong>depto_cod</strong> — código del departamento (ej: 01-04)</li>
+          <li><strong>departamento</strong> — nombre del departamento</li>
+          <li><strong>Una columna por sucursal</strong> (Fair, Burzaco, A.Korn, Tucuman)</li>
+          <li><strong>Total_Global</strong> — total acumulado (opcional)</li>
+        </ul>
+      </div>
+      <div class="suc-upload-ejemplo">
+        <div class="ejemplo-titulo">📄 Ejemplo:</div>
+        <table class="ejemplo-tabla">
+          <thead><tr><th>depto_cod</th><th>departamento</th><th>Fair</th><th>Burzaco</th><th>A.Korn</th><th>Tucuman</th></tr></thead>
+          <tbody>
+            <tr><td>01-03</td><td>FIDEOS</td><td>39014</td><td>8814</td><td>21842</td><td>6818</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="dc-upload-error" class="upload-error" style="display:none"></div>
+      <button class="btn-volver" onclick="switchScreen('inicio')">← Volver</button>
+    </div>
+  </div>
+
+  <!-- ══════════ DASHBOARD depto/familia ══════════ -->
+  <div id="dashboard-screen" style="display:none">
+    <div class="nav-tabs">
+      <div class="nav-tab active"><span id="tab-icon">📦</span> <span id="tab-nombre">Departamentos</span></div>
+      <button class="nav-btn-otra" id="btn-otra-vista" onclick="irOtraVista()"><span id="otra-icon">🏷️</span> Ver Familias</button>
+      <button class="nav-btn-otra" onclick="irASucursales()">🏪 Comp. Familias</button>
+      <button class="nav-btn-otra" onclick="irADptoComp()">🔀 Comp. Deptos</button>
+      <button class="nav-btn-otra" onclick="resetDashboard()">↩ Otro archivo</button>
+    </div>
+    <div class="header">
+      <div class="header-left">
+        <h1 id="header-titulo">Departamentos — Sucursal Tucumán</h1>
+        <p id="header-subtitle">Enero–Mayo 2026</p>
+      </div>
+      <div class="header-right">
+        <div class="header-kpi" id="kpi-mayo">—</div>
+        <div class="header-kpi-lbl">Proyección total mayo</div>
+      </div>
+    </div>
+    <div class="cards">
+      <div class="card c-all active" onclick="setEstado('all')"><div class="card-val" id="cnt-all">—</div><div class="card-lbl" id="card-lbl-all">Registros</div><div class="card-sub" style="color:#533AB7">Todos los estados</div></div>
+      <div class="card c-ok" onclick="setEstado('ok')"><div class="card-val" id="cnt-ok">—</div><div class="card-lbl">✓ En objetivo</div><div class="card-range range-ok">Variación ≥ −5%</div><div class="card-range-desc">Igual o mejor que el promedio histórico</div></div>
+      <div class="card c-warn" onclick="setEstado('warn')"><div class="card-val" id="cnt-warn">—</div><div class="card-lbl">~ Regular</div><div class="card-range range-warn">Variación entre −5% y −20%</div><div class="card-range-desc">Por debajo pero dentro de margen aceptable</div></div>
+      <div class="card c-bad" onclick="setEstado('bad')"><div class="card-val" id="cnt-bad">—</div><div class="card-lbl">▼ Bajo</div><div class="card-range range-bad">Variación &lt; −20%</div><div class="card-range-desc">Requiere atención urgente</div></div>
+    </div>
+    <div class="leyenda-bar">
+      <span class="leyenda-titulo">📊 Criterios de estado:</span>
+      <span class="leyenda-item leyenda-ok">✓ En objetivo → variación ≥ −5%</span><span class="leyenda-sep">|</span>
+      <span class="leyenda-item leyenda-warn">~ Regular → entre −5% y −20%</span><span class="leyenda-sep">|</span>
+      <span class="leyenda-item leyenda-bad">▼ Bajo → peor que −20%</span><span class="leyenda-sep">|</span>
+      <span class="leyenda-base">Base: promedio mensual Enero–Abril</span>
+    </div>
+    <div class="fam-section" id="fam-section"><div class="fam-label">Filtrar por familia</div><div class="fam-pills" id="fam-pills"></div></div>
+    <div class="controls">
+      <input class="search-box" type="text" id="search" placeholder="Buscar...">
+      <div class="state-btns">
+        <button class="sbtn s-all on" data-s="all" onclick="setEstado('all')">Todos</button>
+        <button class="sbtn s-ok"    data-s="ok"   onclick="setEstado('ok')"  >✓ En objetivo <span class="sbtn-range">(≥ −5%)</span></button>
+        <button class="sbtn s-warn"  data-s="warn" onclick="setEstado('warn')">~ Regular <span class="sbtn-range">(−5% a −20%)</span></button>
+        <button class="sbtn s-bad"   data-s="bad"  onclick="setEstado('bad')" >▼ Bajo <span class="sbtn-range">(&lt; −20%)</span></button>
+      </div>
+      <span class="result-count" id="result-count"></span>
+      <button id="btn-agrupar" class="btn-agrupar" onclick="toggleAgrupado()" style="display:none">🗂️ Agrupar por familia</button>
+      <button class="btn-print" onclick="imprimirTabla()">🖨️ Imprimir</button>
+      <button class="btn-download" onclick="descargarHTML('tabla')">📥 Descargar HTML</button>
+    </div>
+    <div class="table-wrap" id="tabla-depto-wrap">
+      <div class="table-scroll"><table>
+        <thead><tr>
+          <th onclick="sortBy('departamento')">Departamento <span class="sa">↕</span></th>
+          <th class="num" onclick="sortBy('Enero')">Enero <span class="sa">↕</span></th>
+          <th class="num" onclick="sortBy('Febrero')">Febrero <span class="sa">↕</span></th>
+          <th class="num" onclick="sortBy('Marzo')">Marzo <span class="sa">↕</span></th>
+          <th class="num" onclick="sortBy('Abril')">Abril <span class="sa">↕</span></th>
+          <th class="num" onclick="sortBy('Mayo')">Mayo real <span class="sa">↕</span></th>
+          <th class="num" onclick="sortBy('proy')">Mayo proy. <span class="sa">↕</span></th>
+          <th class="num" onclick="sortBy('hist')">Prom. hist. <span class="sa">↕</span></th>
+          <th class="num" onclick="sortBy('pct')">Variación <span class="sa">↕</span></th>
+          <th onclick="sortBy('estado')">Estado <span class="sa">↕</span></th>
+        </tr></thead>
+        <tbody id="tbody-depto"></tbody>
+      </table></div>
+      <div class="empty-msg" id="empty-depto" style="display:none">No se encontraron resultados.</div>
+    </div>
+    <div class="table-wrap" id="tabla-familia-wrap" style="display:none">
+      <div class="table-scroll"><table>
+        <thead><tr>
+          <th onclick="sortByFam('familia')">Familia <span class="sa">↕</span></th>
+          <th class="num" onclick="sortByFam('Enero')">Enero <span class="sa">↕</span></th>
+          <th class="num" onclick="sortByFam('Febrero')">Febrero <span class="sa">↕</span></th>
+          <th class="num" onclick="sortByFam('Marzo')">Marzo <span class="sa">↕</span></th>
+          <th class="num" onclick="sortByFam('Abril')">Abril <span class="sa">↕</span></th>
+          <th class="num" onclick="sortByFam('Mayo')">Mayo real <span class="sa">↕</span></th>
+          <th class="num" onclick="sortByFam('proy')">Mayo proy. <span class="sa">↕</span></th>
+          <th class="num" onclick="sortByFam('hist')">Prom. hist. <span class="sa">↕</span></th>
+          <th class="num" onclick="sortByFam('pct')">Variación <span class="sa">↕</span></th>
+          <th onclick="sortByFam('estado')">Estado <span class="sa">↕</span></th>
+        </tr></thead>
+        <tbody id="tbody-familia"></tbody>
+      </table></div>
+      <div class="empty-msg" id="empty-familia" style="display:none">No se encontraron resultados.</div>
+    </div>
+    <div class="footer">
+      <div class="footer-row"><strong>Proyección mayo</strong> = ventas reales × (31 ÷ días) &nbsp;·&nbsp; <strong>Promedio histórico</strong> = promedio mensual Enero–Abril</div>
+      <div class="footer-row footer-estados">
+        <span class="fe-ok">✓ <strong>En objetivo</strong>: ≥ −5%</span><span class="fe-sep">|</span>
+        <span class="fe-warn">~ <strong>Regular</strong>: −5% a −20%</span><span class="fe-sep">|</span>
+        <span class="fe-bad">▼ <strong>Bajo</strong>: &lt; −20%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ COMPARATIVA SUCURSALES (familias) ══════════ -->
+  <div id="sucursales-screen" style="display:none">
+    <div class="nav-tabs">
+      <div class="nav-tab active">🏪 Comparativa Familias</div>
+      <button class="nav-btn-otra" onclick="irASucursalesDesdeNav()">📦 Dashboard</button>
+      <button class="nav-btn-otra" onclick="irADptoComp()">🔀 Comp. Deptos</button>
+      <button class="nav-btn-otra" onclick="switchScreen('upload-sucursales')">↩ Otro archivo</button>
+      <button class="nav-btn-otra" onclick="switchScreen('inicio')">🏠 Inicio</button>
+    </div>
+    <div class="header suc-header">
+      <div class="header-left">
+        <h1>Comparativa de Sucursales por Familia</h1>
+        <p>Participación de unidades vendidas · <span id="suc-file-label" style="color:#a78bfa"></span></p>
+      </div>
+      <div class="suc-header-kpis" id="suc-header-kpis"></div>
+    </div>
+    <div class="suc-legend-bar">
+      <span class="suc-legend-titulo">🏪 Sucursales detectadas:</span>
+      <span id="suc-legend-items"></span>
+      <span class="suc-legend-info">· Color intenso = mayor participación en la fila</span>
+    </div>
+    <div class="controls">
+      <input class="search-box" type="text" id="suc-search" placeholder="Buscar familia...">
+      <div class="suc-sort-btns">
+        <span class="suc-sort-label">Ordenar:</span>
+        <button class="sbtn on" onclick="setSucSort('total')">Mayor total</button>
+        <button class="sbtn"    onclick="setSucSort('familia')">Familia A-Z</button>
+        <span id="suc-sort-btns-dynamic" style="display:contents"></span>
+      </div>
+      <span class="result-count" id="suc-result-count"></span>
+      <button id="btn-restaurar-suc" class="btn-restaurar-suc" onclick="restaurarFamilias()" style="display:none">↩ Restaurar (0)</button>
+      <button class="btn-print" onclick="imprimirSucursales()">🖨️ Imprimir</button>
+      <button class="btn-download" onclick="descargarHTML('sucursales')">📥 Descargar HTML</button>
+    </div>
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table id="tabla-sucursales"><thead><tr></tr></thead><tbody id="tbody-sucursales"></tbody><tfoot id="tfoot-sucursales"></tfoot></table>
+      </div>
+      <div class="empty-msg" id="empty-sucursales" style="display:none">No se encontraron resultados.</div>
+    </div>
+    <div class="footer"><div class="footer-row"><strong>Participación</strong> = unidades de la sucursal ÷ total de la fila × 100 &nbsp;·&nbsp; Color intenso = mayor participación</div></div>
+  </div>
+
+  <!-- ══════════ COMPARATIVA DEPARTAMENTOS ══════════ -->
+  <div id="dpto-comp-screen" style="display:none">
+    <div class="nav-tabs">
+      <div class="nav-tab active">🔀 Comparativa Departamentos</div>
+      <button class="nav-btn-otra" onclick="irADptoCompDesdeNav()">📦 Dashboard</button>
+      <button class="nav-btn-otra" onclick="irASucursales()">🏪 Comp. Familias</button>
+      <button class="nav-btn-otra" onclick="switchScreen('upload-dpto-comp')">↩ Otro archivo</button>
+      <button class="nav-btn-otra" onclick="switchScreen('inicio')">🏠 Inicio</button>
+    </div>
+    <div class="header suc-header">
+      <div class="header-left">
+        <h1>Comparativa de Departamentos por Sucursal</h1>
+        <p>Ventas por sucursal · <span id="dc-file-label" style="color:#a78bfa"></span></p>
+      </div>
+      <div class="suc-header-kpis" id="dc-header-kpis"></div>
+    </div>
+    <div class="suc-legend-bar">
+      <span class="suc-legend-titulo">🏪 Sucursales:</span>
+      <span id="dc-legend-items"></span>
+      <span class="suc-legend-info">· Color intenso = sucursal con mayor venta en ese departamento</span>
+    </div>
+    <!-- Pills de familia -->
+    <div class="dc-fam-bar">
+      <span class="fam-label" style="margin-right:8px">Filtrar familia:</span>
+      <div class="fam-pills" id="dc-fam-pills"></div>
+    </div>
+    <div class="controls">
+      <input class="search-box" type="text" id="dc-search" placeholder="Buscar departamento...">
+      <div class="suc-sort-btns">
+        <span class="suc-sort-label">Ordenar:</span>
+        <button class="sbtn on" id="dc-sort-total"    onclick="setDcSort('total')">Mayor total</button>
+        <button class="sbtn"    id="dc-sort-depto"    onclick="setDcSort('departamento')">Nombre A-Z</button>
+        <span id="dc-sort-btns-dynamic" style="display:contents"></span>
+      </div>
+      <span class="result-count" id="dc-result-count"></span>
+      <button id="btn-dc-agrupar" class="btn-agrupar" onclick="toggleDcAgrupado()">🗂️ Agrupar por familia</button>
+      <button id="btn-restaurar-dc" class="btn-restaurar-suc" onclick="restaurarDeptos()" style="display:none">↩ Restaurar (0)</button>
+      <button class="btn-print" onclick="imprimirDptoComp()">🖨️ Imprimir</button>
+      <button class="btn-download" onclick="descargarHTML('dpto-comp')">📥 Descargar HTML</button>
+    </div>
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table id="tabla-dc"><thead><tr></tr></thead><tbody id="tbody-dc"></tbody><tfoot id="tfoot-dc"></tfoot></table>
+      </div>
+      <div class="empty-msg" id="empty-dc" style="display:none">No se encontraron resultados.</div>
+    </div>
+    <div class="footer"><div class="footer-row"><strong>Ventas</strong> por departamento y sucursal &nbsp;·&nbsp; Color intenso = mayor venta en la fila &nbsp;·&nbsp; Porcentaje = participación sobre el total de la fila</div></div>
+
+    <!-- Panel Lista de Trabajo (flotante) -->
+    <div id="dc-panel-sel" class="dc-panel-sel">
+      <div class="dc-panel-header" onclick="togglePanelSel()">
+        <div class="dc-panel-titulo">
+          📋 Lista de trabajo
+          <span id="dc-sel-badge" class="dc-sel-badge" style="display:none">0</span>
+        </div>
+        <span class="dc-panel-toggle-icon" id="dc-panel-toggle-icon">▲</span>
+      </div>
+      <div id="dc-panel-body" class="dc-panel-body">
+        <div id="dc-sel-lista">
+          <div class="dc-sel-empty">Hacé clic en ☆ en cualquier fila para agregar departamentos a tu lista de trabajo.</div>
+        </div>
+        <div id="dc-sel-btns" class="dc-sel-btns" style="display:none">
+          <button class="dc-btn-limpiar" onclick="limpiarSeleccion()">🗑️ Limpiar todo</button>
+          <button class="dc-btn-descargar" onclick="descargarListaTrabajo()">📥 Descargar lista</button>
+        </div>
+      </div>
+    </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
