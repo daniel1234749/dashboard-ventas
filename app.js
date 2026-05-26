@@ -2202,3 +2202,147 @@ function generarHTMLDptoComp(paraDescarga) {
   <div class="pft">Participación = ventas de la sucursal ÷ total de la fila × 100 | Color intenso = mayor venta en la fila</div>
   ${accion}</body></html>`;
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+// PERSISTENCIA — localStorage
+// Guarda y restaura los 4 datasets al recargar la página
+// ═══════════════════════════════════════════════════════════════
+
+const LS_KEYS = {
+  depto:    'dv_depto',
+  familia:  'dv_familia',
+  suc:      'dv_suc',
+  sucNames: 'dv_suc_names',
+  dcComp:   'dv_dc_comp',
+  dcNames:  'dv_dc_names',
+  dias:     'dv_dias',
+  rango:    'dv_rango',
+};
+
+function guardarEnStorage() {
+  try {
+    if (DATA_DEPTO.length)
+      localStorage.setItem(LS_KEYS.depto, JSON.stringify(DATA_DEPTO));
+    if (DATA_FAMILIA.length)
+      localStorage.setItem(LS_KEYS.familia, JSON.stringify(DATA_FAMILIA));
+    if (DATA_SUCURSALES.length) {
+      localStorage.setItem(LS_KEYS.suc,      JSON.stringify(DATA_SUCURSALES));
+      localStorage.setItem(LS_KEYS.sucNames, JSON.stringify(SUCURSALES));
+    }
+    if (DATA_DPTO_COMP.length) {
+      localStorage.setItem(LS_KEYS.dcComp,  JSON.stringify(DATA_DPTO_COMP));
+      localStorage.setItem(LS_KEYS.dcNames, JSON.stringify(DC_SUCURSALES));
+    }
+    localStorage.setItem(LS_KEYS.dias, diasElapsed);
+    localStorage.setItem(LS_KEYS.rango, JSON.stringify({
+      desde: document.getElementById('fecha-desde')?.value || '',
+      hasta: document.getElementById('fecha-hasta')?.value || '',
+    }));
+  } catch(e) { console.warn('localStorage error:', e); }
+}
+
+function restaurarDesdeStorage() {
+  try {
+    const rawDepto   = localStorage.getItem(LS_KEYS.depto);
+    const rawFamilia = localStorage.getItem(LS_KEYS.familia);
+    const rawSuc     = localStorage.getItem(LS_KEYS.suc);
+    const rawSucN    = localStorage.getItem(LS_KEYS.sucNames);
+    const rawDc      = localStorage.getItem(LS_KEYS.dcComp);
+    const rawDcN     = localStorage.getItem(LS_KEYS.dcNames);
+    const rawDias    = localStorage.getItem(LS_KEYS.dias);
+    const rawRango   = localStorage.getItem(LS_KEYS.rango);
+
+    if (rawRango) {
+      const rango = JSON.parse(rawRango);
+      if (rango.desde) document.getElementById('fecha-desde').value = rango.desde;
+      if (rango.hasta) document.getElementById('fecha-hasta').value = rango.hasta;
+      actualizarPreview();
+    }
+    if (rawDias) diasElapsed = Number(rawDias);
+
+    let hayDatos = false;
+
+    if (rawDepto)   { DATA_DEPTO   = JSON.parse(rawDepto);   hayDatos = true; }
+    if (rawFamilia) { DATA_FAMILIA = JSON.parse(rawFamilia); hayDatos = true; }
+
+    if (rawSuc && rawSucN) {
+      DATA_SUCURSALES = JSON.parse(rawSuc);
+      SUCURSALES      = JSON.parse(rawSucN);
+      injectSucStyles();
+      buildSucTableHeader();
+      buildSucHeaderKpis();
+      hayDatos = true;
+    }
+    if (rawDc && rawDcN) {
+      DATA_DPTO_COMP = JSON.parse(rawDc);
+      DC_SUCURSALES  = JSON.parse(rawDcN);
+      buildDcTableHeader();
+      buildDcFamPills();
+      buildDcHeaderKpis();
+      const panel = document.getElementById('dc-panel-sel');
+      if (panel) panel.classList.add('visible');
+      hayDatos = true;
+    }
+
+    if (!hayDatos) return;
+
+    const ultimaVista = localStorage.getItem('dv_ultima_vista');
+
+    if (ultimaVista === 'departamentos' && DATA_DEPTO.length) {
+      activarDashboard('departamentos');
+    } else if (ultimaVista === 'familias' && DATA_FAMILIA.length) {
+      activarDashboard('familias');
+    } else if (ultimaVista === 'sucursales' && DATA_SUCURSALES.length) {
+      renderSucursales(); switchScreen('sucursales');
+    } else if (ultimaVista === 'dpto-comp' && DATA_DPTO_COMP.length) {
+      renderDptoComp(); switchScreen('dpto-comp');
+    } else if (DATA_DEPTO.length)        { activarDashboard('departamentos'); }
+    else if (DATA_FAMILIA.length)        { activarDashboard('familias'); }
+    else if (DATA_SUCURSALES.length)     { renderSucursales(); switchScreen('sucursales'); }
+    else if (DATA_DPTO_COMP.length)      { renderDptoComp(); switchScreen('dpto-comp'); }
+
+    mostrarBtnLimpiarStorage();
+  } catch(e) {
+    console.warn('Error restaurando:', e);
+    limpiarStorage();
+  }
+}
+
+function limpiarStorage() {
+  Object.values(LS_KEYS).forEach(k => localStorage.removeItem(k));
+  localStorage.removeItem('dv_ultima_vista');
+  DATA_DEPTO = []; DATA_FAMILIA = []; DATA_SUCURSALES = []; DATA_DPTO_COMP = [];
+  SUCURSALES = []; DC_SUCURSALES = [];
+  ocultarBtnLimpiarStorage();
+  switchScreen('inicio');
+}
+
+function mostrarBtnLimpiarStorage() {
+  const btn = document.getElementById('btn-limpiar-storage');
+  if (btn) btn.style.display = '';
+}
+function ocultarBtnLimpiarStorage() {
+  const btn = document.getElementById('btn-limpiar-storage');
+  if (btn) btn.style.display = 'none';
+}
+
+// Sobreescribir switchScreen para auto-guardar al cambiar de vista
+const _origSwitchScreen = switchScreen;
+switchScreen = function(screen) {
+  _origSwitchScreen(screen);
+  if (['dashboard','sucursales','dpto-comp'].includes(screen)) {
+    const map = { dashboard: vistaActual || 'departamentos', sucursales:'sucursales', 'dpto-comp':'dpto-comp' };
+    localStorage.setItem('dv_ultima_vista', map[screen] || screen);
+    guardarEnStorage();
+    mostrarBtnLimpiarStorage();
+  }
+};
+
+window.addEventListener('DOMContentLoaded', restaurarDesdeStorage);
+
+function confirmarLimpiarStorage() {
+  if (confirm('¿Querés borrar todos los datos guardados y volver al inicio?\n\nTendrás que volver a cargar los archivos CSV.')) {
+    limpiarStorage();
+  }
+}

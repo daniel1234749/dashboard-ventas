@@ -1201,3 +1201,24 @@ tr.dc-row-selected td:first-child {
   transition: background 0.15s;
 }
 .dc-btn-descargar:hover { background: #4028a0; }
+
+/* ═══════════════════════════════════════════
+   BOTÓN LIMPIAR STORAGE
+═══════════════════════════════════════════ */
+.nav-btn-limpiar {
+  background: rgba(239,68,68,0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: auto;
+}
+.nav-btn-limpiar:hover {
+  background: rgba(239,68,68,0.3);
+  color: #fff;
+  border-color: #ef4444;
+}
