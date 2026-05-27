@@ -1,7 +1,7 @@
 {
   "periodo": {
     "desde": "2026-05-01",
-    "hasta": "2026-05-25",
+    "hasta": "2026-05-26",
     "etiqueta": "Mayo 2026"
   },
   "archivos": {
@@ -10,5 +10,5 @@
     "sucursales_familias": "data-sucursales-familias.csv",
     "sucursales_deptos":   "data-sucursales-deptos.csv"
   },
-  "actualizado": "25/05/2026 08:00"
+  "actualizado": "27/05/2026 08:00"
 }
