@@ -1222,3 +1222,16 @@ tr.dc-row-selected td:first-child {
   color: #fff;
   border-color: #ef4444;
 }
+
+/* ═══════════════════════════════════════════
+   BADGE DATOS AUTOMÁTICOS
+═══════════════════════════════════════════ */
+.badge-auto {
+  font-size: 11px;
+  color: #4ade80;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.85;
+}

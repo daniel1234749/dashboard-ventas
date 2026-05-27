@@ -60,6 +60,148 @@ const COL_ORDER_DEPTO = ['departamento','Enero','Febrero','Marzo','Abril','Mayo'
 const COL_ORDER_FAM   = ['familia','Enero','Febrero','Marzo','Abril','Mayo','proy','hist','pct','estado'];
 
 // ─────────────────────────────────────────
+// CARGA AUTOMÁTICA DESDE ARCHIVOS FIJOS
+// Lee config.json y los 4 CSV al iniciar
+// ─────────────────────────────────────────
+async function intentarCargaAutomatica() {
+  try {
+    // 1. Leer config.json
+    const cfgRes = await fetch('config.json?v=' + Date.now());
+    if (!cfgRes.ok) return false;  // no hay config, modo manual
+    const cfg = await cfgRes.json();
+
+    // Aplicar fechas del config
+    const desde = cfg.periodo?.desde;
+    const hasta  = cfg.periodo?.hasta;
+    if (desde) document.getElementById('fecha-desde').value = desde;
+    if (hasta)  document.getElementById('fecha-hasta').value  = hasta;
+    actualizarPreview();
+    diasElapsed = getDiasElapsed();
+
+    // Guardar etiqueta del período
+    window._configLabel    = cfg.periodo?.etiqueta    || 'Mayo 2026';
+    window._configActualiz = cfg.actualizado          || '';
+
+    const archivos = cfg.archivos || {};
+
+    // 2. Intentar cargar cada CSV (sin fallar si alguno no existe)
+    const [txtDepto, txtFam, txtSucFam, txtSucDep] = await Promise.all([
+      fetchCSV(archivos.departamentos),
+      fetchCSV(archivos.familias),
+      fetchCSV(archivos.sucursales_familias),
+      fetchCSV(archivos.sucursales_deptos),
+    ]);
+
+    let cargadoAlgo = false;
+
+    if (txtDepto) {
+      const rows = parseCSV(txtDepto);
+      if (rows.length) { buildDataDepto(rows); cargadoAlgo = true; }
+    }
+    if (txtFam) {
+      const rows = parseCSV(txtFam);
+      if (rows.length) { buildDataFamiliaRaw(rows); cargadoAlgo = true; }
+    }
+    if (txtSucFam) {
+      const rows = parseCSV(txtSucFam);
+      if (rows.length) { buildDataSucursalesRaw(rows, archivos.sucursales_familias); cargadoAlgo = true; }
+    }
+    if (txtSucDep) {
+      const rows = parseCSV(txtSucDep);
+      if (rows.length) { buildDataDptoCompRaw(rows, archivos.sucursales_deptos); cargadoAlgo = true; }
+    }
+
+    return cargadoAlgo;
+
+  } catch(e) {
+    console.log('Carga automática no disponible, modo manual.');
+    return false;
+  }
+}
+
+async function fetchCSV(nombre) {
+  if (!nombre) return null;
+  try {
+    const res = await fetch(nombre + '?v=' + Date.now());
+    if (!res.ok) return null;
+    return await res.text();
+  } catch(e) { return null; }
+}
+
+// Versiones "raw" de build que no llaman a activarDashboard/switchScreen
+function buildDataFamiliaRaw(rows) {
+  const factor = DIAS_MES / diasElapsed;
+  const result = rows
+    .filter(r => {
+      const nom = String(r.familia || '').trim();
+      const cod = Number(r.familia_cod ?? -1);
+      if (nom.includes('*') || nom === '' || cod === 0) return false;
+      return (Number(r.Enero||0)+Number(r.Febrero||0)+Number(r.Marzo||0)+Number(r.Abril||0)+Number(r.Mayo||0)) > 0;
+    })
+    .map(r => {
+      const cod  = String(r.familia_cod||'').trim().padStart(2,'0');
+      const ene  = Number(r.Enero||0), feb = Number(r.Febrero||0);
+      const mar  = Number(r.Marzo||0), abr = Number(r.Abril||0);
+      const may  = Number(r.Mayo||0);
+      const hist = (ene+feb+mar+abr)/4;
+      const proy = may * factor;
+      let pct    = hist > 0 ? (proy-hist)/hist*100 : (proy>0?999:0);
+      if (!isFinite(pct)||isNaN(pct)) pct = 0;
+      return { familia_cod:cod, familia:String(r.familia||'').trim(),
+        Enero:ene,Febrero:feb,Marzo:mar,Abril:abr,Mayo:may,
+        proy:Math.round(proy*100)/100, hist:Math.round(hist*100)/100,
+        pct:Math.round(pct*10)/10, estado:pct>=-5?0:pct>=-20?1:2 };
+    }).sort((a,b)=>b.proy-a.proy);
+  if (result.length) DATA_FAMILIA = result;
+}
+
+function buildDataSucursalesRaw(rows, fileName) {
+  const COLS_FIJAS = ['familia_cod','familia'];
+  const detected   = Object.keys(rows[0]||{}).filter(k=>!COLS_FIJAS.includes(k));
+  if (!detected.length) return;
+  SUCURSALES = detected;
+  const result = rows.filter(r=>{
+    const total = SUCURSALES.reduce((s,c)=>s+(Number(r[c])||0),0);
+    return String(r.familia||'').trim()!=='' && total>0;
+  }).map(r=>{
+    const total=SUCURSALES.reduce((s,c)=>s+(Number(r[c])||0),0);
+    const pcts={};let winner=null,winVal=-1;
+    SUCURSALES.forEach(suc=>{const v=Number(r[suc])||0;pcts[suc]=total>0?v/total*100:0;if(v>winVal){winVal=v;winner=suc;}});
+    return {...r,familia_cod:String(r.familia_cod||'').trim(),familia:String(r.familia||'').trim(),total,pcts,winner,...Object.fromEntries(SUCURSALES.map(s=>[s,Number(r[s])||0]))};
+  });
+  if (result.length) {
+    DATA_SUCURSALES = result;
+    document.getElementById('suc-file-label').textContent = fileName;
+    // Header y render se hacen después de que la pantalla esté visible (ver DOMContentLoaded)
+  }
+}
+
+function buildDataDptoCompRaw(rows, fileName) {
+  const COLS_FIJAS = ['depto_cod','departamento','Total_Global','total_global','total','Total'];
+  const detected   = Object.keys(rows[0]||{}).filter(k=>!COLS_FIJAS.includes(k));
+  if (!detected.length) return;
+  DC_SUCURSALES = detected;
+  const result = rows.filter(r=>{
+    const nombre=String(r.departamento||'').trim();
+    const total=DC_SUCURSALES.reduce((s,c)=>s+(Number(r[c])||0),0);
+    return nombre!==''&&total>0;
+  }).map(r=>{
+    const cod=String(r.depto_cod||'').trim();
+    const famCod=(cod.split('-')[0]||'99').padStart(2,'0');
+    const total=DC_SUCURSALES.reduce((s,c)=>s+(Number(r[c])||0),0);
+    const vals={},pcts={};let winner=null,winVal=-1;
+    DC_SUCURSALES.forEach(suc=>{const v=Number(r[suc])||0;vals[suc]=v;pcts[suc]=total>0?v/total*100:0;if(v>winVal){winVal=v;winner=suc;}});
+    return {depto_cod:cod,departamento:String(r.departamento||'').trim(),
+      familia_cod:famCod,familia_nom:FAMILIA_NOMBRES[famCod]||`FAM ${famCod}`,total,vals,pcts,winner};
+  });
+  if (result.length) {
+    DATA_DPTO_COMP = result;
+    document.getElementById('dc-file-label').textContent = fileName;
+    // Header y render se hacen después de que la pantalla esté visible (ver DOMContentLoaded)
+  }
+}
+
+// ─────────────────────────────────────────
 // PANTALLA INICIO
 // ─────────────────────────────────────────
 function elegirVista(vista) {
@@ -570,13 +712,28 @@ function processFile(file) {
 }
 
 function parseCSV(text) {
-  const lines   = text.trim().split('\n');
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-  return lines.slice(1).map(line => {
-    const vals = line.split(',');
-    const obj  = {};
+  // Normalizar saltos de línea Windows (\r\n) y Mac (\r)
+  const lines   = text.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').trim());
+  return lines.slice(1).filter(l => l.trim() !== '').map(line => {
+    // Parser robusto que maneja campos con comillas y comas internas
+    const vals = [];
+    let cur = '', inQ = false;
+    for (let ci = 0; ci < line.length; ci++) {
+      const ch = line[ci];
+      if (ch === '"') {
+        if (inQ && line[ci+1] === '"') { cur += '"'; ci++; }
+        else inQ = !inQ;
+      } else if (ch === ',' && !inQ) {
+        vals.push(cur); cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    vals.push(cur);
+    const obj = {};
     headers.forEach((h, i) => {
-      const v = (vals[i] || '').trim().replace(/^"|"$/g, '');
+      const v = (vals[i] || '').trim().replace(/^"|"$/g, '').trim();
       const n = parseFloat(v);
       obj[h]  = isNaN(n) ? v : n;
     });
@@ -2339,7 +2496,53 @@ switchScreen = function(screen) {
   }
 };
 
-window.addEventListener('DOMContentLoaded', restaurarDesdeStorage);
+window.addEventListener('DOMContentLoaded', async () => {
+  // 1. Intentar carga automática desde archivos fijos
+  const cargado = await intentarCargaAutomatica();
+  if (cargado) {
+
+    // Inicializar sucursales si hay datos (en background, pantalla oculta)
+    if (DATA_SUCURSALES.length) {
+      injectSucStyles();
+      buildSucTableHeader();
+      buildSucHeaderKpis();
+      renderSucursales();
+    }
+
+    // Inicializar dpto-comp si hay datos (en background, pantalla oculta)
+    if (DATA_DPTO_COMP.length) {
+      buildDcTableHeader();
+      buildDcFamPills();
+      buildDcHeaderKpis();
+      renderDptoComp();
+      const panel = document.getElementById('dc-panel-sel');
+      if (panel) panel.classList.add('visible');
+    }
+
+    // Mostrar la primera vista disponible
+    if (DATA_DEPTO.length)             activarDashboard('departamentos');
+    else if (DATA_FAMILIA.length)      activarDashboard('familias');
+    else if (DATA_SUCURSALES.length)   switchScreen('sucursales');
+    else if (DATA_DPTO_COMP.length)    switchScreen('dpto-comp');
+
+    mostrarBtnLimpiarStorage();
+    mostrarBadgeAuto();
+    return;
+  }
+  // 2. Si no hay archivos fijos, intentar restaurar desde localStorage
+  restaurarDesdeStorage();
+});
+
+function mostrarBadgeAuto() {
+  const actualiz = window._configActualiz || '';
+  // Agregar indicador en el header del dashboard
+  const badge = document.createElement('div');
+  badge.id        = 'badge-auto';
+  badge.className = 'badge-auto';
+  badge.innerHTML = `🔄 Datos automáticos${actualiz ? ' · Actualizado: ' + actualiz : ''}`;
+  const header = document.querySelector('.header-left p');
+  if (header) header.after(badge);
+}
 
 function confirmarLimpiarStorage() {
   if (confirm('¿Querés borrar todos los datos guardados y volver al inicio?\n\nTendrás que volver a cargar los archivos CSV.')) {
